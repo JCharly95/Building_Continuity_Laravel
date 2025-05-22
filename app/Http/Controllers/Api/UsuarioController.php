@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Hash;
 
 class UsuarioController extends Controller
 {
@@ -26,18 +27,22 @@ class UsuarioController extends Controller
     $flights = Flight::where('active', 1)
         ->orderBy('name')
         ->take(10)
-        ->get(); */
+        ->get();
+    Nota para la elaboracion de la consultas:
+    Se debe usar get() al final si se busca obtener multiples registros y first() en caso de requerir un solo registro. */
 
     /** Metodo para buscar un usuario */
     public function buscarUsuario(Request $consulta){
-        // Validar la direccion de correo
-        $validador = Validator::make($consulta->all(), ['correo' => 'required|email']);
+        // Validar la direccion de correo enviada desde el cliente
+        $validador = Validator::make($consulta->all(), [
+            'correo' => 'required|email'
+        ]);
 
         // Retornar error si el validador falla
         if($validador->fails())
             return response()->json(['msgError' => 'Error: No se ingresó una dirección de correo valida, favor de revisarla.'], 500);
 
-        // Buscar y obtener el usuario en la BD usando el correo ingresado
+        // Buscar y obtener el usuario en la BD
         $infoRes = Usuario::where('Correo', '=', $consulta->correo)->first();
 
         // Regresar un error si no se encontró el usuario
@@ -46,5 +51,103 @@ class UsuarioController extends Controller
 
         // Regresar la información encontrada en la BD
         return response()->json(['results' => [$infoRes->Correo, $infoRes->Contra]], 200);
+    }
+
+    /** Buscar usuario para recuperación de acceso */
+    public function buscarUsuarioRecu(Request $consulta){
+        // Validar los campos enviados desde el cliente
+        $validador = Validator::make($consulta->all(), [
+            'codBus' => 'required|regex:/^(?!.*\s{2,})([A-Z]{3}[-]?[\d]{4})$/',
+            'nomBus' => 'required|regex:/^(?!.*\s{2,})([a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]+(?:\s[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]+)*)$/',
+            'apePatBus' => 'required|regex:/^(?!.*\s{2,})([a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]+)$/',
+            'apeMatBus' => 'required|regex:/^(?!.*\s{2,})([a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]+)$/',
+            'correoBus' => 'required|email'
+        ]);
+
+        // Retornar error si el validador falla
+        if($validador->fails())
+            return response()->json(['msgError' => 'Error: Uno de los campos no cumple con las normas para el ingreso de información. Favor de revisar la información ingresada.'], 500);
+
+        // Buscar y obtener el usuario en la BD
+        $infoRes = Usuario::where([
+            ['Cod_User', '=', $consulta->codBus],
+            ['Nombre', '=', $consulta->nomBus],
+            ['Ape_Pat', '=', $consulta->apePatBus],
+            ['Ape_Mat', '=', $consulta->apeMatBus],
+            ['Correo', '=', $consulta->correoBus]
+        ])->first();
+
+        // Regresar un error si el no se encontro el usuario
+        if(!$infoRes)
+            return response()->json(['msgError' => 'Error: Favor de revisar la información ingresada.'], 500);
+
+        // Regresar la información encontrada en la BD
+        return response()->json(['results' => [$infoRes->Cod_User, $infoRes->Correo]], 200);
+    }
+
+    /** Actualizar la fecha del ultimo acceso */
+    public function nueValUltiAcc(Request $consulta){
+        // Primero se verifica que el usuario en cuestion exista
+        $usuario = Usuario::where('Correo', '=', $consulta->correo)->first();
+
+        // Retornar error si el validador falla
+        if(!$usuario)
+            return response()->json(['msgError' => 'Error: El usuario que se referencia no existe.'], 500);
+
+        // Validar los campos enviados desde el cliente
+        $validador = Validator::make($consulta->all(), [
+            'correo' => 'required|email',
+            'fechaUltiAcc' => 'required',
+        ]);
+
+        // Retornar error si el validador falla
+        if($validador->fails())
+            return response()->json(['msgError' => 'Error: Actualización de ultimo acceso corrompida.'], 500);
+
+        // Establecer el valor del campo ultimo acceso si la consulta desde el cliente trae los campos requeridos
+        if($consulta->has('correo') && $consulta->has('fechaUltiAcc')){
+            $usuario->UltimoAcceso = $consulta->fechaUltiAcc;
+        }
+        
+        // Actualizar el valor
+        $usuario->save();
+
+        // Regresar el mensaje de consulta realizada
+        return response()->json(['results' => 'La fecha de acceso fue actualizada.'], 200);
+    }
+
+    /** Actualizar la contraseña */
+    public function nueValContra(Request $consulta){
+        // Primero se verifica que el usuario en cuestion exista
+        $usuario = Usuario::where([
+            ['Cod_User', '=', $consulta->codUsu],
+            ['Nombre', '=', $consulta->nomPerso]
+        ])->first();
+
+        // Retornar error si el validador falla
+        if(!$usuario)
+            return response()->json(['msgError' => 'Error: El usuario no existe.'], 500);
+
+        // Validar los campos enviados desde el cliente
+        $validador = Validator::make($consulta->all(), [
+            'codUsu' => 'required|regex:/^(?!.*\s{2,})([A-Z]{3}[-]?[\d]{4})$/',
+            'nomPerso' => 'required|regex:/^(?!.*\s{2,})([a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]+(?:\s[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]+)*)$/',
+            'nueContraVal' => 'required|regex:/^(?!\s+$)(?=\S{6,20}$)(?=.*[A-ZÁÉÍÓÚÜÑ])(?=.*[a-záéíóúüñ])(?=.*\d)(?=.*[^\w\s])[^\s]{6,20}$/u'
+        ]);
+
+        // Retornar error si el validador falla
+        if($validador->fails())
+            return response()->json(['msgError' => 'Error: Favor de revisar la información que utilizó para la actualización de datos.'], 500);
+
+        // Establecer el valor del campo contraseña hasheado (por defecto con 12 rondas) si la consulta desde el cliente trae los campos requeridos
+        if($consulta->has('codUsu') && $consulta->has('nomPerso') && $consulta->has('nueContraVal')){
+            $usuario->Contra = Hash::make($consulta->nueContraVal);
+        }
+        
+        // Actualizar el valor
+        $usuario->save();
+
+        // Regresar el mensaje de consulta realizada
+        return response()->json(['results' => 'La información de '.$consulta->nomPerso.' fue actualizada exitosamente.'], 200);
     }
 }

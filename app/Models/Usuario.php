@@ -18,7 +18,7 @@ class Usuario extends Model
      * @var bool */
     public $timestamps = false;
 
-    /** Los atributos que pueden ser asignados en consultas de datos masivas.
+    /** Los atributos que pueden ser asignados en consultas de datos masivas. (Y obtenidos si se hace un get)
      * @var list<string> */
     protected $fillable = [
         'Cod_User',
@@ -26,7 +26,12 @@ class Usuario extends Model
         'Ape_Mat',
         'Nombre',
         'Correo',
-        'Contra',
         'UltimoAcceso'
+    ];
+
+    /** Los atributos que deben ser ocultados para la serialización. (Ocultos en consultas get)
+     * @var list<string> */
+    protected $hidden = [
+        'Contra'
     ];
 }

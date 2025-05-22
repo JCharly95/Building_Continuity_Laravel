@@ -3,57 +3,47 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UsuarioController;
+use App\Http\Controllers\Api\RegistroSensorController;
+use App\Http\Controllers\Api\SensorController;
+use App\Http\Controllers\Api\TipoSensorController;
+use App\Http\Controllers\Api\LinkRecuController;
 
 /*Route::get("/busUser", function(){
     return "Nombre del endpoint viejo: getBusUs";
 });*/
-Route::get("/busUser", [UsuarioController::class, "buscarUsuario"]);
+Route::get("/busUsuario", [UsuarioController::class, "buscarUsuario"]);
 
-Route::get("/busUsRecu", function(){
-    return "Nombre del endpoint viejo: getBusUsRecuPass";
-});
+Route::get("/busUsRecu", [UsuarioController::class, "buscarUsuarioRecu"]);
 
-Route::get("/histoComple", function(){
-    return "Nombre del endpoint viejo: getHistoGen";
-});
+Route::get("/histoComple", [RegistroSensorController::class, "listaRegistroSensores"]);
 
 Route::get("/histoEspeci", function() {
     return "Nombre del endpoint viejo: getHistoEspeci";
 });
 
-Route::get("/listaSenRegi", function() {
-    return "Nombre del endpoint viejo: getSensRegi";
-});
+Route::get("/sensoresRegi", [SensorController::class, "listaSenRegi"]);
 
-Route::get("/listaSenNoRegi", function(){
-    return "Nombre del endpoint viejo: getSensNoRegi";
-});
+Route::get("/sensoresNoRegi", [TipoSensorController::class, "listaSensoresNoRegi"]);
 
-Route::get("/linkActuPass", function(){
-    return "Nombre del endpoint viejo: getRutaActuPass";
-});
+Route::get("/linkActuContra", [LinkRecuController::class, "obteRutaActuSis"]);
 
-Route::post("/mandCorRecu", function(){
+Route::post("/enviCorRecu", function(){
     return "Nombre del endpoint viejo: postCorreoRecu";
 });
 
-Route::post("/regiSen", function(){
+Route::post("/registroSen", function(){
     return "Nombre del endpoint viejo: postNueSens";
 });
 
-Route::post("/genRutaRecu", function(){
+Route::post("/crearLinkRecu", function(){
     return "Nombre del endpoint viejo: postRutaActuPass";
 });
 
-Route::patch("/actUltiAcc", function(){
-    return "Nombre del endpoint viejo: postUltiAcc";
-});
+Route::patch("/actUltiAcc", [UsuarioController::class, "nueValUltiAcc"]);
 
-Route::patch("/actuContra", function(){
-    return "Nombre del endpoint viejo: postActuPass";
-});
+Route::patch("/actuContra", [UsuarioController::class, "nueValContra"]);
 
-Route::delete("/linkActuPass", function(){
+Route::delete("/borLinkActuContra", function(){
     return "Nombre del endpoint viejo: delRutaActuPass";
 });
 
