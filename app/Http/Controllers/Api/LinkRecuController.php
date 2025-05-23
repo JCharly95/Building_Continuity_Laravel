@@ -8,6 +8,8 @@ use App\Models\Link_Recu;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\Api\UsuarioController;
 use App\Helpers\GenLinksHelper;
+use App\Mail\RecuperacionEmail;
+use Illuminate\Support\Facades\Mail;
 
 class LinkRecuController extends Controller
 {
@@ -88,5 +90,49 @@ class LinkRecuController extends Controller
         if(!$guardaLink)
             return response()->json(['msgError' => 'Error: Proceso de recuperación interrumpido. Favor de intentar nuevamente.'], 500);
 
+        // Enviar el correo de recuperación
+        $enviarCorreo = Mail::to($consulta->correoBus)->send(new RecuperacionEmail([
+            'nombre' => $consulta->nomBus,
+            'apePat' => $consulta->apePatBus,
+            'apeMat' => $consulta->apeMatBus,
+            'dirEnvio' => $consulta->dirEnvio,
+            'linkRecuCor' => 'http://localhost:8000/api/linkActuContra?linkCorreo='.$linkRecuGen
+        ]));
+        
+        // Revisar que el envio de correo se haya realizado
+        if(is_null($enviarCorreo))
+            return response()->json(['msgError' => 'Error: El correo de recuperación no pudo ser enviado.'], 500);
+        
+        // Regresar la información encontrada en la BD
+        return response()->json(['results' => 'Correo de recuperación enviado. Favor de revisar su correo electronico para continuar con el proceso de renovación.'], 200);
+    }
+
+    /** Metodo para borrar el registro de recuperación para evitar un segundo uso */
+    public function borLinkRecu(Request $consulta){
+        // Validar el link enviado en la consulta desde el cliente
+        $validador = Validator::make($consulta->all(), [
+            'linkCorreo' => 'required|regex:/^[a-zA-Z\d-]{1,8}$/'
+        ]);
+
+        // Retornar error si el validador falla
+        if($validador->fails())
+            return response()->json(['msgError' => 'Error: Información no encontrada.'], 500);
+
+        // Obtener el ID del registro a eliminar
+        $idLinkRecu = Link_Recu::where('Link_Correo', '=', $consulta->linkCorreo)->value('ID_Link');
+
+        // Regresar un error si el no se encontro el usuario
+        if(!$idLinkRecu)
+            return response()->json(['msgError' => 'Error: Información no encontrada, el registro de esta recuperación no existe o ya fue eliminado.'], 404);
+
+        // Borrar el registro de la recuperación
+        $resBorRecu = Link_Recu::delete($idLinkRecu);
+
+        // Regresar un error si el no se encontro el usuario
+        if(!$resBorRecu)
+            return response()->json(['msgError' => 'Error: El registro de recuperación solicitado no pudo ser eliminado.'], 404);
+
+        // Regresar la información encontrada en la BD
+        return response()->json(['results' => 'La recuperación solicitada fue eliminada con exito'], 200);
     }
 }

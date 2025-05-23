@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\LinkRecuController;
 });*/
 Route::get("/busUsuario", [UsuarioController::class, "buscarUsuario"]);
 
+// Este endpoint sera absorvido por el proceso del nuevo endpoint /crearRecuAccUs
 //Route::get("/busUsRecu", [UsuarioController::class, "buscarUsuarioRecu"]);
 
 Route::get("/histoComple", [RegistroSensorController::class, "listaRegistroSensores"]);
@@ -27,23 +28,20 @@ Route::get("/sensoresNoRegi", [TipoSensorController::class, "listaSensoresNoRegi
 
 Route::get("/linkActuContra", [LinkRecuController::class, "obteRutaActuSis"]);
 
-Route::post("/enviCorRecu", function(){
+// Este endpoint sera absorvido por el proceso del nuevo endpoint /crearRecuAccUs
+/*Route::post("/enviCorRecu", function(){
     return "Nombre del endpoint viejo: postCorreoRecu";
-});
+});*/
 
-Route::post("/registroSen", [SensorController::class], 'regiSensor');
+Route::post("/registroSen", [SensorController::class, 'regiSensor']);
 
-Route::post("/crearLinkRecu", function(){
-    return "Nombre del endpoint viejo: postRutaActuPass";
-});
+Route::post("/crearRecuAccUs", [LinkRecuController::class, 'crearUsuRecu']);
 
 Route::patch("/actUltiAcc", [UsuarioController::class, "nueValUltiAcc"]);
 
 Route::patch("/actuContra", [UsuarioController::class, "nueValContra"]);
 
-Route::delete("/borLinkActuContra", function(){
-    return "Nombre del endpoint viejo: delRutaActuPass";
-});
+Route::delete("/borLinkRecuper", [LinkRecuController::class, "borLinkRecu"]);
 
 // Endpoint de prueba para probar la conexion con los controladores
 Route::get("/listaUsuarios", [UsuarioController::class, "listaUsuarios"]);
