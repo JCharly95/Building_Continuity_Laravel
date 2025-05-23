@@ -13,7 +13,7 @@ use App\Http\Controllers\Api\LinkRecuController;
 });*/
 Route::get("/busUsuario", [UsuarioController::class, "buscarUsuario"]);
 
-Route::get("/busUsRecu", [UsuarioController::class, "buscarUsuarioRecu"]);
+//Route::get("/busUsRecu", [UsuarioController::class, "buscarUsuarioRecu"]);
 
 Route::get("/histoComple", [RegistroSensorController::class, "listaRegistroSensores"]);
 
@@ -31,9 +31,7 @@ Route::post("/enviCorRecu", function(){
     return "Nombre del endpoint viejo: postCorreoRecu";
 });
 
-Route::post("/registroSen", function(){
-    return "Nombre del endpoint viejo: postNueSens";
-});
+Route::post("/registroSen", [SensorController::class], 'regiSensor');
 
 Route::post("/crearLinkRecu", function(){
     return "Nombre del endpoint viejo: postRutaActuPass";

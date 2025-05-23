@@ -37,18 +37,26 @@ class SensorController extends Controller
 
     /** Metodo para registrar un sensor */
     public function regiSensor(Request $consulta){
-        // Obtener la lista de sensores registrados y verificar si el sensor en cuestion ya existe en el sistema
+        // Obtener la lista de sensores registrados y verificar si el sensor en cuestión ya existe en el sistema
         $sensoRegi = $this->listaSenRegi();
-        if($sensoRegi){
-        // Decodificar el json y recorrerlo en busqueda de algun registro previo
-        $senDatos = json_decode($sensoRegi);
-            foreach($senDatos->results as $sensor){
-                if($sensor->ID_ == $consulta->identiNiag)
-                    return response()->json(['msgError' => 'Error: El sensor a registrar ya existe en el sistema, favor de intentar con otro.'], 500);
+
+        // Determinar si se obtuvo una respuesta no vacia
+        if(!empty($sensoRegi->getContent())){
+            // Decodificar el json y determinar que tipo de respuesta se obtuvo acorde a las propiedades de la respuesta
+            $senDatos = json_decode($sensoRegi, true);
+            // Si se obtuvo un error de busqueda se regresará un error de procesamiento del sistema
+            if(array_key_exists('msgError', $senDatos))
+                return response()->json(['msgError' => $senDatos['msgError']], 404);
+
+            // Si no, se recorrera el resultado en busqueda de algún registro previo
+            foreach($senDatos['results'] as $sensor){
+                if($sensor['ID_'] == $consulta->identiNiag){
+                    return response()->json(['msgError' => 'Error: El sensor a registrar ya existe en el sistema.'], 500);
+                }
             }
         }
         
-        // Si no retornamos error en este punto, continuamos con el proceso, en este caso validar los campos
+        // Si no se ha regresado error hasta este punto, continuamos con el proceso, en este caso validar los campos
         $validador = Validator::make($consulta->all(), [
             'identiNiag' => 'required',
             'nombre' => 'required'
@@ -56,13 +64,26 @@ class SensorController extends Controller
 
         // Retornar error si el validador falla
         if($validador->fails())
-            return response()->json(['msgError' => 'Error: Favor de ingresar la información requerida.'], 500);
+            return response()->json(['msgError' => 'Error: Favor de revisar la información ingresada.'], 500);
 
         // Obtener el id del tipo de sensor registrado con el id de niagara
         $idTipoSen = Tipo_Sensor::where('ID_', '=', $consulta->identiNiag)->value('ID');
 
-        // Regresar un error si el no se encontro el usuario
+        // Regresar un error porque no se encontró el id del tipo de sensor
         if(!$idTipoSen)
-            return response()->json(['msgError' => 'Error: Información no encontrada, la solicitud en cuestión no existe o ya fue realizada, favor de generar otra.'], 500);
+            return response()->json(['msgError' => 'Error: El sistema no pudo encontrar la información relacionada con la solicitud.'], 500);
+
+        // Registrar el sensor en el sistema (Insert a la BD)
+        $sensor = Sensor::create([
+            'Nombre' => $consulta->nombre,
+            'Tipo_ID' => $consulta->identiNiag
+        ]);
+
+        // Regresar un error si no se pudo registrar el sensor
+        if(!$idTipoSen)
+            return response()->json(['msgError' => 'Error: El sensor'.$consulta->nombre.' no pudo ser registrado. Favor de intentar nuevamente.'], 500);
+
+        // Regresar el mensaje de consulta realizada
+        return response()->json(['results' => 'El sensor'.$consulta->nombre.' fue registrado exitosamente.'], 200);
     }
 }
