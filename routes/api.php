@@ -18,9 +18,10 @@ Route::get("/busUsuario", [UsuarioController::class, "buscarUsuario"]);
 
 Route::get("/histoComple", [RegistroSensorController::class, "listaRegistroSensores"]);
 
-Route::get("/histoEspeci", function() {
+/*Route::get("/histoEspeci", function() {
     return "Nombre del endpoint viejo: getHistoEspeci";
-});
+});*/
+Route::get("/histoEspeci", [RegistroSensorController::class, "listaRegistroEspeci"]);
 
 Route::get("/sensoresRegi", [SensorController::class, "listaSenRegi"]);
 
@@ -45,3 +46,5 @@ Route::delete("/borLinkRecuper", [LinkRecuController::class, "borLinkRecu"]);
 
 // Endpoint de prueba para probar la conexion con los controladores
 Route::get("/listaUsuarios", [UsuarioController::class, "listaUsuarios"]);
+// Obtener el listado de todos los sensores
+Route::get("/fullRegi", [RegistroSensorController::class, "listaRegistroSensores"]);
