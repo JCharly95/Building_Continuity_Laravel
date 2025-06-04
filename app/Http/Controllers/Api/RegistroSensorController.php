@@ -66,48 +66,52 @@ class RegistroSensorController extends Controller{
             ['HISTORY_ID', '=', $consulta->senBus]
         ])->count();
 
-        // Si la cantidad de registros es menor a 15000 elementos, se regresará el result set de una vez
-        if($cantRegis < 15000){
+        // Si la cantidad de registros es menor a 15000 elementos, se regresará el bloque de registros sin reducir
+        if($cantRegis <= 15000){
             $infoRes = Registro_Sensor::on('mariadb_unbuffered')->where([
                 ['TIMESTAMP', '>=', ($consulta->fechIni * 1000)],
                 ['TIMESTAMP', '<=', ($consulta->fechFin * 1000)],
                 ['HISTORY_ID', '=', $consulta->senBus]
-            ])->orderBy('TIMESTAMP')->get();
+            ])->orderBy('TIMESTAMP')
+            ->get(['TIMESTAMP', 'VALUE', 'STATUS_TAG']);
 
             return response()->json(['results' => $infoRes], 200);
         }
 
-        // Si no, se realizará el proceso de reducción de valores
-        // Paso 0: Ajustar los valores temporalmente de PHP para evitar el bloqueo de espera en la consulta: limite de memoria, tiempo maximo de ejecucion de scripts (en segundos) y tiempo maximo para la obtención de informacion (en segundos); en este caso la BD
-        //ini_set('memory_limit', '1024M');
-        ini_set('max_execution_time', 300);
-        ini_set('max_input_time', 300);
+        // Si no, se realizará el proceso de reducción de valores.
+        // NOTA: A diferencia de node, PHP es monohilo y si se desea trabajar con "hilos" en PHP se hariá con Jobs. El problema es que los jobs trabajan de forma independiente y debido a esto, no se puede capturar la información procesada de forma directa (como promesas con JS), para eso se usaria redis, guardar de forma temporal la información que se estuviera generando (seria como un sqlite en el navegador, algo asi entendi). En su lugar, se optó realizar la reducción mediante paginación, es decir, ir reduciendo la información evaluandola bloque a bloque, en lugar de todo a la vez.
 
-        // Establecer el arreglo de resultados
+        // Paso 0: Ajustar los valores temporalmente de PHP para evitar el bloqueo de espera en la consulta: limite de memoria, tiempo máximo de ejecución de scripts (en segundos) y tiempo máximo para la obtención de información (en segundos); en este caso la BD. Ambos se establecerán a 7 minutos
+        //ini_set('memory_limit', '1024M');
+        ini_set('max_execution_time', 420);
+        ini_set('max_input_time', 420);
+
+        // Paso 1: Crear el arreglo de resultados
         $arrResRedu = [];
 
-        // Determinar la longitud de las muestras para el proceso de reducción
+        // Paso 2: Determinar la longitud de las muestras para el proceso de reducción
         $longiMuesRedu = ceil($cantRegis / 7500);
 
-        // Determinar la longitud de los bloques de datos para cada "hilo" bloque de procesamiento de informacion
+        // Paso 3: Determinar la longitud de los bloques de datos para cada (hilo) bloque de procesamiento
         $cantElemBloq = ceil($cantRegis / 4);
 
-        //Buscar y crear bloques de registro (paginar) el resultado de la consulta (usando chunk)
+        // Paso 4: Buscar y crear bloques de registros (paginar) el resultado de la consulta (usando chunk) sin guardar en el buffer para evitar el desborde de memoria. Este proceso seria el equivalente a la evaluación por hilos, ya que los bloques seran del tamaño de los hilos (1/4 de la consulta)
         Registro_Sensor::on('mariadb_unbuffered')->where([
             ['TIMESTAMP', '>=', ($consulta->fechIni * 1000)],
             ['TIMESTAMP', '<=', ($consulta->fechFin * 1000)],
             ['HISTORY_ID', '=', $consulta->senBus]
         ])->orderBy('TIMESTAMP')
+        ->select(['TIMESTAMP', 'VALUE', 'STATUS_TAG'])
         ->chunk($cantElemBloq, function (Collection $bloqueHilo) use(&$arrResRedu, $longiMuesRedu){
-            // Reiniciar las claves de cada bloque de datos para evitar el error de elementos asociativos
+            // Paso 5: Reiniciar las claves de cada bloque de datos para evitar el error de elementos asociativos
+            // El error es que la primera iteraccion resulto en: [...] y las posteriores en: {ID: 9, [...]}
             $bloqueHilo = $bloqueHilo->values();
             
-            // Invocar la funcion de creacion del hilo y agregar el resultado al arreglo de resultados
+            // Paso 6: Llamar al metodo de reducción, transformar la colección de resultados a un arreglo y agregarlo al arreglo de resultados que se regresara al cliente. Se usa array_merge para agregar el resultado obtenido en el final del arreglo de valores ya obtenido
             $arrResRedu = array_merge($arrResRedu, $this->hiloAnaRedu($bloqueHilo, $longiMuesRedu)->toArray());
         });
 
-        var_dump($arrResRedu);
-        // Determinar si el arreglo de resultados tiene valores (es decir, si se reducion satisfactoriamente)
+        // Si el arreglo de resultados no tiene valores, se regresará un error
         if (count($arrResRedu) <= 0)
             return response()->json(['msgError' => 'Error: No se encontró la información solicitada.'], 404);
 
@@ -119,39 +123,18 @@ class RegistroSensorController extends Controller{
      * @param int $longiMues Longitud de los subarreglos a analizar; las muestras
      * @return Illuminate\Support\Collection Colección de valores filtrado resultante de menor longitud a la colección inicial */
     protected function hiloAnaRedu(Collection $colecARedu, int $longiMues){
-        // Crear la colección de resultados
+        /** @var \Illuminate\Support\Collection<string|int, mixed> $colecReduRes Colección de registros que almacenará el resultado de la de reducción*/
         $colecReduRes = collect();
 
-        // Fraccionar la colección de registros acorde a la longitud ingresada y reiniciar las claves
+        // Fraccionar la colección de registros acorde a la longitud ingresada y reiniciar las claves para evitar el error de elementos asociativos
         $colecMuest = $colecARedu->chunk($longiMues);
         $colecMuest = $colecMuest->values();
         
-        // Recorrer el arreglo de valores para obtener los resultados correspondientes de cada subarreglo(seccion particionada)
+        // Recorrer el arreglo de valores para obtener los registros correspondientes de cada subarreglo(seccion particionada)
         foreach($colecMuest as $muestra){
             // Obtener los valores minimo y maximo de la muestra
             $valMinMues = $muestra->min('VALUE');
             $valMaxMues = $muestra->max('VALUE');
-
-            /* Obtener todos los registros que coincidan con los valores obtenidos anteriormente y segun la cantidad de registros obtenidos, se agregan en la coleccion de resultados
-            $arrRegiMin = $muestra->where('VALUE', "=", $valMinMues)->get();
-            $arrRegiMax = $muestra->where('VALUE', "=", $valMaxMues)->get();
-
-            /*if($arrRegiMin->count() > 1)
-                foreach($arrRegiMin as $regiMin){
-                    $colecReduRes->push($regiMin);
-                }
-            else
-                $colecReduRes->push($arrRegiMin);
-
-            if($arrRegiMax->count() > 1)
-                foreach($arrRegiMax as $regiMax){
-                    $colecReduRes->push($regiMax);
-                }
-            else
-                $colecReduRes->push($arrRegiMax);
-
-            // Ordenar la coleccion en base a la columna de la fecha y reemplazar el resultado
-            $colecReduRes = $colecReduRes->sortBy('TIMESTAMP', SORT_NUMERIC);*/
 
             // Obtener los primeros registros que coincidan con el valor minimo y maximo de la muestra
             $regiMin = $muestra->firstWhere('VALUE', "=", $valMinMues);
@@ -159,7 +142,8 @@ class RegistroSensorController extends Controller{
 
             // Agregar los registros obtenidos en la colección de resultados a regresar
             $colecReduRes->push($regiMin, $regiMax);
-            // Ordenar los elementos de la colección en base al campo de la fecha
+
+            // Ordenar los elementos de la colección en base al campo de la fecha y haciendo comparacion numerica (la bandera de sort implementada)
             $colecReduRes = $colecReduRes->sortBy('TIMESTAMP', SORT_NUMERIC);
         }
         return $colecReduRes;
