@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Mail;
 
 class LinkRecuController extends Controller
 {
-    /** Metodo para obtener todos los enlaces de recuperación guardados */
+    /** Metodo para obtener todos los enlaces de recuperación guardados
+     * @return \Illuminate\Http\JsonResponse Respuesta obtenida en formato JSON tanto mensaje de error como arreglo de registros */
     public function listaEnlacesRecu(){
         // Obtener todos los enlaces de recuperación en el sistema
         $enlacesRecu = Link_Recu::all();
@@ -26,7 +27,9 @@ class LinkRecuController extends Controller
         return response()->json(['results' => $enlacesRecu], 200);
     }
 
-    /** Metodo para obtener la ruta del sistema en base al enlace enviado en el correo */
+    /** Metodo para obtener la ruta del sistema en base al enlace enviado en el correo 
+     * @param \Illuminate\Http\Request $consulta Arreglo de valores con los elementos enviados desde el cliente
+     * @return \Illuminate\Http\JsonResponse Respuesta obtenida en formato JSON tanto mensaje de error como arreglo de registros */
     public function obteRutaActuSis(Request $consulta){
         // Validar el link enviado en la consulta desde el cliente
         $validador = Validator::make($consulta->all(), [
@@ -48,7 +51,9 @@ class LinkRecuController extends Controller
         return response()->json(['results' => $rutaSis], 200);
     }
 
-    /** Metodo para generar el link de recuperación, guardarlo en la BD y enviar el correo de recuperación */
+    /** Metodo para generar el link de recuperación, guardarlo en la BD y enviar el correo de recuperación 
+     * @param \Illuminate\Http\Request $consulta Arreglo de valores con los elementos enviados desde el cliente
+     * @return \Illuminate\Http\JsonResponse Respuesta obtenida en formato JSON tanto mensaje de error como arreglo de registros */
     public function crearUsuRecu(Request $consulta){
         // NOTA Futura: La estructura de la recuperación cambiará ligeramente, puesto que ya no será necesario crear multiples elementos alternando entre back y front (generar el codigo, guardarlo en la bd y enviar el correo) para hacerlo.
         /* La recuperación cambiará a la siguiente forma: 
@@ -59,10 +64,7 @@ class LinkRecuController extends Controller
         4.- Una vez guardado el link en la bd, se procederá con el envio del correo de recuperación al cliente.
         5.- Al terminar el proceso se le regresará al cliente la respuesta obtenida del envio
         NOTA: Si en algún punto el proceso se corrompe o hay errores, se regresarán errores como en las demas funciones realizadas */
-
-        /* Nombres de los parametros enviados desde el cliente:
-        'codBus', 'nomBus', 'apePatBus', 'apeMatBus', 'correoBus' */
-
+        
         // Crear un objeto del controlador usuario y usar el metodo de busqueda de usuario recuperacion
         $busUsuaRecu = app(UsuarioController::class)->buscarUsuarioRecu($consulta);
         
@@ -90,7 +92,7 @@ class LinkRecuController extends Controller
         if(!$guardaLink)
             return response()->json(['msgError' => 'Error: Proceso de recuperación interrumpido. Favor de intentar nuevamente.'], 500);
 
-        // Enviar el correo de recuperación
+        // Enviar el correo de recuperación. NOTA: Revisar la estructura del enlace de recuperación al momento de montarlo en el servidor correspondiente
         $enviarCorreo = Mail::to($consulta->correoBus)->send(new RecuperacionEmail([
             'nombre' => $consulta->nomBus,
             'apePat' => $consulta->apePatBus,
@@ -107,7 +109,9 @@ class LinkRecuController extends Controller
         return response()->json(['results' => 'Correo de recuperación enviado. Favor de revisar su correo electronico para continuar con el proceso de renovación.'], 200);
     }
 
-    /** Metodo para borrar el registro de recuperación para evitar un segundo uso */
+    /** Metodo para borrar el registro de recuperación para evitar un segundo uso 
+     * @param \Illuminate\Http\Request $consulta Arreglo de valores con los elementos enviados desde el cliente
+     * @return \Illuminate\Http\JsonResponse Respuesta obtenida en formato JSON tanto mensaje de error como arreglo de registros */
     public function borLinkRecu(Request $consulta){
         // Validar el link enviado en la consulta desde el cliente
         $validador = Validator::make($consulta->all(), [
@@ -128,7 +132,7 @@ class LinkRecuController extends Controller
         // Borrar el registro de la recuperación
         $resBorRecu = Link_Recu::delete($idLinkRecu);
 
-        // Regresar un error si el no se encontro el usuario
+        // Regresar un error si el registro no fue eliminado
         if(!$resBorRecu)
             return response()->json(['msgError' => 'Error: El registro de recuperación solicitado no pudo ser eliminado.'], 404);
 

@@ -10,7 +10,8 @@ use App\Models\Tipo_Sensor;
 
 class SensorController extends Controller
 {
-    /** Metodo para regresar todos los sensores de la tabla */
+    /** Metodo para regresar todos los sensores nombrados
+     * @return \Illuminate\Http\JsonResponse Respuesta obtenida en formato JSON tanto mensaje de error como arreglo de registros */
     public function listaSensores(){
         // Obtener todos los sensores de la BD usando el modelo para buscarlos
         $sensores = Sensor::all();
@@ -23,7 +24,8 @@ class SensorController extends Controller
         return response()->json(['results' => $sensores], 200);
     }
 
-    /** Metodo para regresar todos los sensores que estan registrados */
+    /** Metodo para regresar todos los sensores que estan registrados con la relación de los tipos de sensores
+     * @return \Illuminate\Http\JsonResponse Respuesta obtenida en formato JSON tanto mensaje de error como arreglo de registros */
     public function listaSenRegi(){
         $listaSenRegi = Sensor::select('sensor.ID_Sensor' ,'sensor.Nombre', 'history_type_map.ID_', 'history_type_map.VALUEFACETS')->join('history_type_map', 'sensor.Tipo_ID', '=', 'history_type_map.ID')->get();
 
@@ -35,7 +37,9 @@ class SensorController extends Controller
         return response()->json(['results' => $listaSenRegi], 200);
     }
 
-    /** Metodo para registrar un sensor */
+    /** Metodo para registrar/nombrar un sensor 
+     * @param \Illuminate\Http\Request $consulta Arreglo de valores con los elementos enviados desde el cliente
+     * @return \Illuminate\Http\JsonResponse Respuesta obtenida en formato JSON tanto mensaje de error como arreglo de registros */
     public function regiSensor(Request $consulta){
         // Obtener la lista de sensores registrados y verificar si el sensor en cuestión ya existe en el sistema
         $sensoRegi = $this->listaSenRegi();
@@ -50,9 +54,8 @@ class SensorController extends Controller
 
             // Si no, se recorrera el resultado en busqueda de algún registro previo
             foreach($senDatos['results'] as $sensor){
-                if($sensor['ID_'] == $consulta->identiNiag){
+                if($sensor['ID_'] == $consulta->identiNiag)
                     return response()->json(['msgError' => 'Error: El sensor a registrar ya existe en el sistema.'], 500);
-                }
             }
         }
         
