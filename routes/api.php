@@ -8,6 +8,18 @@ use App\Http\Controllers\Api\SensorController;
 use App\Http\Controllers\Api\TipoSensorController;
 use App\Http\Controllers\Api\LinkRecuController;
 
+Route::get('/token', function (Request $request) {
+    $token = $request->session()->token();
+    $token = csrf_token();
+ 
+    // Regresar un error si no se generó el token
+    if(!$token)
+        return response()->json(['msgError' => 'Error: Favor de revisar la información ingresada.'], 500);
+
+    // Regresar el token
+    return response()->json(['results' => $token], 200);
+});
+
 /*Route::get("/busUser", function(){
     return "Nombre del endpoint viejo: getBusUs";
 });*/

@@ -46,7 +46,7 @@ class UsuarioController extends Controller
             return response()->json(['msgError' => 'Error: No se ingresó una dirección de correo valida, favor de revisarla.'], 500);
 
         // Buscar y obtener el usuario en la BD
-        $infoRes = Usuario::where('Correo', '=', $consulta->correo)->select(['Correo', 'Contra'])->first();
+        $infoRes = Usuario::where('Correo', '=', $consulta->correo)->select(['Correo', 'Contra'])->first()->makeVisible(['Contra']);
 
         // Regresar un error si no se encontró el usuario
         if(!$infoRes)
@@ -104,7 +104,7 @@ class UsuarioController extends Controller
         // Validar los campos enviados desde el cliente
         $validador = Validator::make($consulta->all(), [
             'correo' => 'required|email',
-            'fechaUltiAcc' => 'required',
+            'fechLAcc' => 'required',
         ]);
 
         // Retornar error si el validador falla
@@ -112,8 +112,8 @@ class UsuarioController extends Controller
             return response()->json(['msgError' => 'Error: Actualización de ultimo acceso corrompida.'], 500);
 
         // Establecer el valor del campo ultimo acceso si la consulta desde el cliente trae los campos requeridos
-        if($consulta->has('correo') && $consulta->has('fechaUltiAcc'))
-            $usuario->UltimoAcceso = $consulta->fechaUltiAcc;
+        if($consulta->has('correo') && $consulta->has('fechLAcc'))
+            $usuario->UltimoAcceso = $consulta->fechLAcc;
         
         // Actualizar el valor
         $usuario->save();
@@ -128,7 +128,7 @@ class UsuarioController extends Controller
     public function nueValContra(Request $consulta){
         // Primero se verifica que el usuario en cuestion exista
         $usuario = Usuario::where([
-            ['Cod_User', '=', $consulta->codUsu],
+            ['Cod_User', '=', $consulta->codigo],
             ['Nombre', '=', $consulta->nomPerso]
         ])->select(['Cod_User', 'Correo'])->first();
 
@@ -138,9 +138,9 @@ class UsuarioController extends Controller
 
         // Validar los campos enviados desde el cliente
         $validador = Validator::make($consulta->all(), [
-            'codUsu' => 'required|regex:/^(?!.*\s{2,})([A-Z]{3}[-]?[\d]{4})$/',
+            'codigo' => 'required|regex:/^(?!.*\s{2,})([A-Z]{3}[-]?[\d]{4})$/',
             'nomPerso' => 'required|regex:/^(?!.*\s{2,})([a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]+(?:\s[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]+)*)$/',
-            'nueContraVal' => 'required|regex:/^(?!\s+$)(?=\S{6,20}$)(?=.*[A-ZÁÉÍÓÚÜÑ])(?=.*[a-záéíóúüñ])(?=.*\d)(?=.*[^\w\s])[^\s]{6,20}$/u'
+            'nContraVal' => 'required|regex:/^(?!\s+$)(?=\S{6,20}$)(?=.*[A-ZÁÉÍÓÚÜÑ])(?=.*[a-záéíóúüñ])(?=.*\d)(?=.*[^\w\s])[^\s]{6,20}$/u'
         ]);
 
         // Retornar error si el validador falla
@@ -148,13 +148,15 @@ class UsuarioController extends Controller
             return response()->json(['msgError' => 'Error: Favor de revisar la información que utilizó para la actualización de datos.'], 500);
 
         // Establecer el valor del campo contraseña hasheado (por defecto con 12 rondas) si la consulta desde el cliente trae los campos requeridos
-        if($consulta->has('codUsu') && $consulta->has('nomPerso') && $consulta->has('nueContraVal'))
-            $usuario->Contra = Hash::make($consulta->nueContraVal);
+        if($consulta->has('codigo') && $consulta->has('nomPerso') && $consulta->has('nContraVal'))
+            $usuario->Contra = Hash::make($consulta->nContraVal);
         
         // Actualizar el valor
         $usuario->save();
 
         // Regresar el mensaje de consulta realizada
         return response()->json(['results' => 'La información de '.$consulta->nomPerso.' fue actualizada exitosamente.'], 200);
+
+        // Pendiente; tengo la duda de ver como crear un "catch" para casos donde no se realice la actualización del registro efectivamente.
     }
 }

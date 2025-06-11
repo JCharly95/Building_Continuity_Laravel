@@ -48,6 +48,7 @@ class SensorController extends Controller
         if(!empty($sensoRegi->getContent())){
             // Decodificar el json y determinar que tipo de respuesta se obtuvo acorde a las propiedades de la respuesta
             $senDatos = json_decode($sensoRegi, true);
+            
             // Si se obtuvo un error de busqueda se regresará un error de procesamiento del sistema
             if(array_key_exists('msgError', $senDatos))
                 return response()->json(['msgError' => $senDatos['msgError']], 404);
